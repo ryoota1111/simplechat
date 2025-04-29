@@ -158,7 +158,7 @@ def lambda_handler(event, context):
             
         except urllib.error.HTTPError as e:
             error_detail = e.read().decode()
-            f e.getcode() == 422:  # 422エラーを処理
+            if e.getcode() == 422:  # 422エラーを処理
                 # 422エラーの詳細を解析
                 error_response = json.loads(error_detail)
                 error_messages = error_response.get("detail", [])
