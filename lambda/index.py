@@ -97,7 +97,7 @@ def lambda_handler(event, context):
         }
 
         payload = {
-            "prompt": messages,
+            "prompt": prompt,
             "max_new_tokens": 512,
             "do_sample": True,
             "temperature": 0.7,
