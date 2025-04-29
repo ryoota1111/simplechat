@@ -123,7 +123,7 @@ def lambda_handler(event, context):
         )
 
         try: 
-            with urllib.request.urlopen(req, timeout=120) as response:
+            with urllib.request.urlopen(req) as response:
                 response_body = json.loads(response.read().decode())
 
             # if response.status_code != 200:
