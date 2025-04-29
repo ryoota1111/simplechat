@@ -106,7 +106,7 @@ def lambda_handler(event, context):
         # )
 
         req = urllib.request.Request(
-            FASTAPI_URL,
+            fastapi_endpoint,
             headers=headers,
             data=data,
             method="POST"
