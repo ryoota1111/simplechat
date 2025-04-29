@@ -96,7 +96,7 @@ def lambda_handler(event, context):
         
         data = json.dumps(payload).encode("utf-8")
         
-        print("Calling FastAPI invoke_model API with payload:", json.dumps(request_payload))
+        print("Calling FastAPI invoke_model API with payload:", json.dumps(payload))
         
         # invoke_model APIを呼び出し
         # response = bedrock_client.invoke_model(
