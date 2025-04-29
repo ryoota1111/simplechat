@@ -17,7 +17,7 @@ def extract_region_from_arn(arn):
 
 # グローバル変数としてクライアントを初期化（初期値）
 # bedrock_client = None
-fastapi_endpoint = "https://3b2d-35-194-186-141.ngrok-free.app/generate"
+fastapi_endpoint = "https://b133-35-194-186-141.ngrok-free.app/generate"
 
 # モデルID
 MODEL_ID = os.environ.get("MODEL_ID", "us.amazon.nova-lite-v1:0")
