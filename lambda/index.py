@@ -58,18 +58,28 @@ def lambda_handler(event, context):
         
         # Nova Liteモデル用のリクエストペイロードを構築
         # 会話履歴を含める
-        messages = []
+        # messages = []
+        # for msg in messages:
+            # if msg["role"] == "user":
+                # messages.append({
+                    # "role": "user",
+                    # "content": [{"text": msg["content"]}]
+                # })
+            # elif msg["role"] == "assistant":
+                # messages.append({
+                    # "role": "assistant", 
+                    # "content": [{"text": msg["content"]}]
+                # })
+
+        prompt = ""
         for msg in messages:
-            if msg["role"] == "user":
-                messages.append({
-                    "role": "user",
-                    "content": [{"text": msg["content"]}]
-                })
-            elif msg["role"] == "assistant":
-                messages.append({
-                    "role": "assistant", 
-                    "content": [{"text": msg["content"]}]
-                })
+            role = msg["role"]
+            content = msg["content"]
+            if role == "user":
+                prompt += f"ユーザー: {content}\n"
+            elif role == "assistant":
+                prompt += f"アシスタント: {content}\n"
+        prompt += "アシスタント: "
         
         # invoke_model用のリクエストペイロード
         # request_payload = {
