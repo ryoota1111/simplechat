@@ -3,7 +3,7 @@ import json
 import os
 import boto3
 import re  # 正規表現モジュールをインポート
-import requests
+import urllib.request
 from botocore.exceptions import ClientError
 
 
@@ -85,7 +85,7 @@ def lambda_handler(event, context):
         headers = {
             "Content-Type": "application/json"
         }
-        
+
         payload = {
             "prompt": messages,
             "max_new_tokens": 512,
@@ -93,6 +93,8 @@ def lambda_handler(event, context):
             "temperature": 0.7,
             "top_p": 0.9
         }
+        
+        data = json.dumps(payload).encode("utf-8")
         
         print("Calling FastAPI invoke_model API with payload:", json.dumps(request_payload))
         
@@ -103,53 +105,67 @@ def lambda_handler(event, context):
             # contentType="application/json"
         # )
 
-        response = requests.post(
+        req = urllib.request.Request(
             FASTAPI_URL,
             headers=headers,
-            json=payload,
-            timeout=30
+            data=data,
+            method="POST"
         )
-        response.raise_for_status()
 
-        if response.status_code != 200:
-            error_detail = response.json()
-            raise Exception(f"API error {response.status_code}: {json.dumps(error_detail, ensure_ascii=False)}")
+        try: 
+            with urllib.request.urlopen(req) as response:
+                response_body = json.loads(response.read().decode())
+
+            # if response.status_code != 200:
+                # error_detail = response.json()
+                # raise Exception(f"API error {response.status_code}: {json.dumps(error_detail, ensure_ascii=False)}")
         
-        # レスポンスを解析
-        response_body = response.json()
-        print("FastAPI response:", json.dumps(response_body, default=str))
+            # レスポンスを解析
+            # response_body = response.json()
+            print("FastAPI response:", json.dumps(response_body, default=str))
         
-        # 応答の検証
-        # if not response_body.get('output') or not response_body['output'].get('message') or not response_body['output']['message'].get('content'):
-            # raise Exception("No response content from the model")
-        if 'generated_text' not in response_body or not response_body['generated_text']:
-            raise Exception("No generated_text returned from the model")
+            # 応答の検証
+            # if not response_body.get('output') or not response_body['output'].get('message') or not response_body['output']['message'].get('content'):
+                # raise Exception("No response content from the model")
+            if 'generated_text' not in response_body or not response_body['generated_text']:
+                raise Exception("No generated_text returned from the model")
         
-        # アシスタントの応答を取得
-        # assistant_response = response_body['output']['message']['content'][0]['text']
-        assistant_response = response_body['generated_text']
-        
-        # アシスタントの応答を会話履歴に追加
-        messages.append({
-            "role": "assistant",
-            "content": assistant_response
-        })
-        
-        # 成功レスポンスの返却
-        return {
-            "statusCode": 200,
-            "headers": {
-                "Content-Type": "application/json",
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
-                "Access-Control-Allow-Methods": "OPTIONS,POST"
-            },
-            "body": json.dumps({
-                "success": True,
-                "response": assistant_response,
-                "conversationHistory": messages
+            # アシスタントの応答を取得
+            # assistant_response = response_body['output']['message']['content'][0]['text']
+            assistant_response = response_body['generated_text']
+            
+            # アシスタントの応答を会話履歴に追加
+            messages.append({
+                "role": "assistant",
+                "content": assistant_response
             })
-        }
+        
+            # 成功レスポンスの返却
+            return {
+                "statusCode": 200,
+                "headers": {
+                    "Content-Type": "application/json",
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
+                    "Access-Control-Allow-Methods": "OPTIONS,POST"
+                },
+                "body": json.dumps({
+                    "success": True,
+                    "response": assistant_response,
+                    "conversationHistory": messages
+                })
+            }
+            
+        except urllib.error.HTTPError as e:
+            error_detail = e.read().decode()
+            f e.getcode() == 422:  # 422エラーを処理
+                # 422エラーの詳細を解析
+                error_response = json.loads(error_detail)
+                error_messages = error_response.get("detail", [])
+                error_msg = ", ".join([f"{err['loc'][0]}: {err['msg']}" for err in error_messages])
+                raise Exception(f"API error 422: {error_msg}")
+            else:
+                raise Exception(f"API error {e.getcode()}: {error_detail}")
         
     except Exception as error:
         print("Error:", str(error))
