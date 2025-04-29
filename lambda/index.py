@@ -3,6 +3,7 @@ import json
 import os
 import boto3
 import re  # 正規表現モジュールをインポート
+import requests
 from botocore.exceptions import ClientError
 
 
@@ -15,7 +16,8 @@ def extract_region_from_arn(arn):
     return "us-east-1"  # デフォルト値
 
 # グローバル変数としてクライアントを初期化（初期値）
-bedrock_client = None
+# bedrock_client = None
+fastapi_endpoint = "https://f749-35-194-186-141.ngrok-free.app/generate"
 
 # モデルID
 MODEL_ID = os.environ.get("MODEL_ID", "us.amazon.nova-lite-v1:0")
@@ -23,11 +25,11 @@ MODEL_ID = os.environ.get("MODEL_ID", "us.amazon.nova-lite-v1:0")
 def lambda_handler(event, context):
     try:
         # コンテキストから実行リージョンを取得し、クライアントを初期化
-        global bedrock_client
-        if bedrock_client is None:
-            region = extract_region_from_arn(context.invoked_function_arn)
-            bedrock_client = boto3.client('bedrock-runtime', region_name=region)
-            print(f"Initialized Bedrock client in region: {region}")
+        # global bedrock_client
+        # if bedrock_client is None:
+            # region = extract_region_from_arn(context.invoked_function_arn)
+            # bedrock_client = boto3.client('bedrock-runtime', region_name=region)
+            # print(f"Initialized Bedrock client in region: {region}")
         
         print("Received event:", json.dumps(event))
         
@@ -56,49 +58,76 @@ def lambda_handler(event, context):
         
         # Nova Liteモデル用のリクエストペイロードを構築
         # 会話履歴を含める
-        bedrock_messages = []
+        messages = []
         for msg in messages:
             if msg["role"] == "user":
-                bedrock_messages.append({
+                messages.append({
                     "role": "user",
                     "content": [{"text": msg["content"]}]
                 })
             elif msg["role"] == "assistant":
-                bedrock_messages.append({
+                messages.append({
                     "role": "assistant", 
                     "content": [{"text": msg["content"]}]
                 })
         
         # invoke_model用のリクエストペイロード
-        request_payload = {
-            "messages": bedrock_messages,
-            "inferenceConfig": {
-                "maxTokens": 512,
-                "stopSequences": [],
-                "temperature": 0.7,
-                "topP": 0.9
-            }
+        # request_payload = {
+            # "messages": bedrock_messages,
+            # "inferenceConfig": {
+                # "maxTokens": 512,
+                # "stopSequences": [],
+                # "temperature": 0.7,
+                # "topP": 0.9
+            # }
+        # }
+
+        headers = {
+            "Content-Type": "application/json"
         }
         
-        print("Calling Bedrock invoke_model API with payload:", json.dumps(request_payload))
+        payload = {
+            "prompt": messages,
+            "max_new_tokens": 512,
+            "do_sample": True,
+            "temperature": 0.7,
+            "top_p": 0.9
+        }
+        
+        print("Calling FastAPI invoke_model API with payload:", json.dumps(request_payload))
         
         # invoke_model APIを呼び出し
-        response = bedrock_client.invoke_model(
-            modelId=MODEL_ID,
-            body=json.dumps(request_payload),
-            contentType="application/json"
+        # response = bedrock_client.invoke_model(
+            # modelId=MODEL_ID,
+            # body=json.dumps(request_payload),
+            # contentType="application/json"
+        # )
+
+        response = requests.post(
+            FASTAPI_URL,
+            headers=headers,
+            json=payload,
+            timeout=30
         )
+        response.raise_for_status()
+
+        if response.status_code != 200:
+            error_detail = response.json()
+            raise Exception(f"API error {response.status_code}: {json.dumps(error_detail, ensure_ascii=False)}")
         
         # レスポンスを解析
-        response_body = json.loads(response['body'].read())
-        print("Bedrock response:", json.dumps(response_body, default=str))
+        response_body = response.json()
+        print("FastAPI response:", json.dumps(response_body, default=str))
         
         # 応答の検証
-        if not response_body.get('output') or not response_body['output'].get('message') or not response_body['output']['message'].get('content'):
-            raise Exception("No response content from the model")
+        # if not response_body.get('output') or not response_body['output'].get('message') or not response_body['output']['message'].get('content'):
+            # raise Exception("No response content from the model")
+        if 'generated_text' not in response_body or not response_body['generated_text']:
+            raise Exception("No generated_text returned from the model")
         
         # アシスタントの応答を取得
-        assistant_response = response_body['output']['message']['content'][0]['text']
+        # assistant_response = response_body['output']['message']['content'][0]['text']
+        assistant_response = response_body['generated_text']
         
         # アシスタントの応答を会話履歴に追加
         messages.append({
